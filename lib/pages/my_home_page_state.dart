@@ -5,8 +5,8 @@ import 'package:gpoint/pages/details.dart';
 
 
 
-//declaramos un struc para poder guardar los datos de los juegos <3
-//hacer que se pueda abrir la los juegos añadidos a otra pantalla
+//hacer que se pueda abrir la los juegos añadidos a otra pantalla (listo)
+//agregar una pantalla de about 
 
 
  class Juego {

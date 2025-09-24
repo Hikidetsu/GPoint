@@ -92,7 +92,6 @@ class Details extends StatelessWidget {
               );
             },
           ),
-          // ELIMINAR
           IconButton(
             icon: const Icon(Icons.delete),
             onPressed: () {
@@ -114,6 +113,14 @@ class Details extends StatelessWidget {
             const SizedBox(height: 16),
             Text("Estado: ${juego.estado}"),
             Text("Score: ${juego.score}"),
+            const Text(
+              "Aqui iran futuros detalles",
+              style: TextStyle(
+                fontSize: 20,
+                fontStyle: FontStyle.italic,
+                color:Colors.black,
+              ),
+            )
           ],
         ),
       ),
