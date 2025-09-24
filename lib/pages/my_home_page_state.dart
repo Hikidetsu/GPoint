@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:gpoint/pages/news.dart';
 import 'package:gpoint/pages/search.dart';
+import 'package:gpoint/pages/details.dart';
 
 
 
 //declaramos un struc para poder guardar los datos de los juegos <3
+//hacer que se pueda abrir la los juegos añadidos a otra pantalla
+
+
  class Juego {
       final String nombre;
       final String estado;
@@ -53,7 +57,7 @@ class _MyHomePageState extends State<MyHomePage> {
       
       Juego(nombre: "Larry", estado: "Played", score: "7", imagen: "assets/Larry.png"),
       Juego(nombre: "LeapGalaxy", estado: "Interested", score: " ", imagen: "assets/LeapGalaxy.png"),
-      Juego(nombre: "SilkSong", estado: "Playing", score: " ", imagen: "assets/Silksong.png"),
+      Juego(nombre: "SilkSong", estado: "Playing", score: "10", imagen: "assets/Silksong.png"),
 
 
     ];
@@ -67,7 +71,8 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        title: Text(widget.title),
+        centerTitle: true,
+        title: Image.asset('assets/Gsinfondo.png',height: 40,fit:BoxFit.contain),
       ),
       body: Column(
         children: [
@@ -111,6 +116,24 @@ class _MyHomePageState extends State<MyHomePage> {
                     title: Text(juego.nombre),
                     subtitle: Text("Score: ${juego.score}"),
                     trailing: Text(juego.estado),
+                    onTap: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder:(context) => Details(juego:juego, index: index),
+                        ),
+                      );
+                      if(result == "delete"){
+                        setState(() {
+                          juegos.removeAt(index);
+                        });
+                      }
+                      else if (result is Juego){
+                        setState(() {
+                          juegos[index]=result;
+                        });
+                      }
+                    }
                   ),
                 );
               },
@@ -145,7 +168,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   const SizedBox(height: 12),
                   TextField(
                     decoration: const InputDecoration(
-                      labelText: "Score",
+                      labelText: "Score(1-10)",
                       border: OutlineInputBorder(),
                     ),
                     keyboardType: TextInputType.number,
