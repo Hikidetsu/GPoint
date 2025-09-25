@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gpoint/pages/about.dart';
 import 'package:gpoint/pages/news.dart';
 import 'package:gpoint/pages/search.dart';
 import 'package:gpoint/pages/details.dart';
@@ -52,6 +53,14 @@ class _MyHomePageState extends State<MyHomePage> {
       MaterialPageRoute(builder: (context) => Search()),
     );
     }
+    void _goToAbout(){
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context)=> About()),
+      );
+    }
+
+    
   
      List<Juego> juegos = [
       
@@ -73,7 +82,16 @@ class _MyHomePageState extends State<MyHomePage> {
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
         title: Image.asset('assets/Gsinfondo.png',height: 40,fit:BoxFit.contain),
+      
+
+      leading:IconButton(
+        icon: const Icon(Icons.info),
+        onPressed: (){
+          _goToAbout();
+        },
+      )
       ),
+
       body: Column(
         children: [
           Container(
