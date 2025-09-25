@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gpoint/main.dart';
 import 'package:gpoint/pages/my_home_page_state.dart';
+import 'package:gpoint/models/game.dart';
 
 
 class Details extends StatelessWidget {
 
-  final Juego juego;
+  final Game juego;
   final int index;
   const Details({Key? key, required this.juego, required this.index}): super(key: key);
 
@@ -21,6 +23,8 @@ class Details extends StatelessWidget {
               String nuevoNombre = juego.nombre;
               String nuevoScore = juego.score;
               String nuevoEstado = juego.estado;
+              String nuevoComentario=juego.comentario ?? "";
+              
 
               showDialog(
                 context: context,
@@ -64,6 +68,15 @@ class Details extends StatelessWidget {
                             }
                           },
                         ),
+                        TextField(
+                          decoration: const InputDecoration(
+                            labelText: "Comentario(opcional)",
+                            border:OutlineInputBorder(),
+                          ),
+                          controller: TextEditingController(text:nuevoComentario),
+                          maxLines: 2,
+                          onChanged: (value) => nuevoComentario=value,
+                        )
                       ],
                     ),
                     actions: [
@@ -76,11 +89,12 @@ class Details extends StatelessWidget {
                           Navigator.pop(context); 
                           Navigator.pop(
                             context,
-                            Juego(
+                            Game(
                               nombre: nuevoNombre,
                               score: nuevoScore,
                               estado: nuevoEstado,
                               imagen: juego.imagen,
+                              comentario: nuevoComentario.isNotEmpty ? nuevoComentario: null,
                             ),
                           ); 
                         },
@@ -100,27 +114,56 @@ class Details extends StatelessWidget {
           ),
         ],
       ),
-      body: Center(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start, 
           children: [
-            if (juego.imagen != null)
-              Image.asset(
-                juego.imagen!,
-                width: 150,
-                height: 150,
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (juego.imagen != null)
+                    Image.asset(
+                      juego.imagen!,
+                      width: 150,
+                      height: 150,
+                    ),
+                  const SizedBox(height: 16),
+                  Text("Estado: ${juego.estado}"),
+                  Text("Score: ${juego.score}"),
+                  Text("Género: ${juego.genero}"),
+                  Text("Plataforma: ${juego.plataforma}"),
+                ],
               ),
-            const SizedBox(height: 16),
-            Text("Estado: ${juego.estado}"),
-            Text("Score: ${juego.score}"),
-            const Text(
-              "Aqui iran futuros detalles",
-              style: TextStyle(
-                fontSize: 20,
-                fontStyle: FontStyle.italic,
-                color:Colors.black,
-              ),
+            ),
+            const SizedBox(height: 30),
+            Text(
+              "Sinopsis:",
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if(juego.sinopsis !=null && juego.sinopsis!.isNotEmpty)
+            Text(
+              juego.sinopsis!,
+              style: const TextStyle(fontSize: 16),
             )
+            else
+            const SizedBox.shrink(),
+
+            const SizedBox(height: 30),
+            Text(
+              "Comentario:",
+              style: TextStyle(fontSize: 18,fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            if(juego.comentario!=null && juego.comentario!.isNotEmpty)
+            Text(
+              juego.comentario!,
+              style: const TextStyle(fontSize: 16),
+            )
+            else
+            const SizedBox.shrink(),
           ],
         ),
       ),

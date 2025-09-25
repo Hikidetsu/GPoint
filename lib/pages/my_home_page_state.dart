@@ -3,6 +3,7 @@ import 'package:gpoint/pages/about.dart';
 import 'package:gpoint/pages/news.dart';
 import 'package:gpoint/pages/search.dart';
 import 'package:gpoint/pages/details.dart';
+import 'package:gpoint/models/game.dart';
 
 
 
@@ -10,14 +11,7 @@ import 'package:gpoint/pages/details.dart';
 //agregar una pantalla de about 
 
 
- class Juego {
-      final String nombre;
-      final String estado;
-      final String score;
-      final String ?imagen;
-
-      Juego({required this.nombre, required this.estado, required this.score, this.imagen});
-    }
+ 
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -62,11 +56,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
     
   
-     List<Juego> juegos = [
+     List<Game> juegos = [
       
-      Juego(nombre: "Larry", estado: "Played", score: "7", imagen: "assets/Larry.png"),
-      Juego(nombre: "LeapGalaxy", estado: "Interested", score: " ", imagen: "assets/LeapGalaxy.png"),
-      Juego(nombre: "SilkSong", estado: "Playing", score: "10", imagen: "assets/Silksong.png"),
+      Game(nombre: "Larry", estado: "Played", score: "7", imagen: "assets/Larry.png",genero:"Contenido sexual/Desnudos/Aventuras",
+      plataforma: "Playstation 2/PC/Xbox",
+      sinopsis: "Con estudiantes universitarias guapísimas por todas partes, el nerd universitario Larry Lovage va tras algo más que su diploma. Intenta estar a la altura de la leyenda de su tío, Larry Laffer, el playboy de poliéster favorito de todos.",
+      comentario: "Riquisimo. mi juego favorito 10/10"),
+      Game(nombre: "LeapGalaxy", estado: "Interested", score: " ", imagen: "assets/LeapGalaxy.png",genero: "Carreras/Plataforma2D",
+      plataforma: "PC",
+      sinopsis: "Leap Galaxy es un videojuego de plataformas 2D con estética minimalista y jugabilidad que enfatiza velocidad y fluidez. ¡Aprovecha el momentum y perfecciona el impulso entregado por tus disparos para superar cada nivel en el menor tiempo posible!.",
+      comentario: "El mejor indie chileno jamas creado, el creador debio farmear bastante aura"),
+
+      Game(nombre: "SilkSong", estado: "Playing", score: "10", imagen: "assets/Silksong.png",genero: "Metroidvania/Indie/Dificiles",
+      plataforma: "PC/MacOS/Linux/Nintendo Switch/Playstation 4/Playstation 5/Xbox One/ Xbox Series X/S",
+      sinopsis: "¡Descubre un vasto reino embrujado en Hollow Knight: Silksong! Explora, lucha y sobrevive mientras asciendes a la cima de una tierra gobernada por la seda y la canción.",
+      comentario: "Hollow Knigth parece una demo al lado de silkSong 10/10 goty"),
 
 
     ];
@@ -146,7 +150,7 @@ class _MyHomePageState extends State<MyHomePage> {
                           juegos.removeAt(index);
                         });
                       }
-                      else if (result is Juego){
+                      else if (result is Game){
                         setState(() {
                           juegos[index]=result;
                         });
@@ -168,6 +172,7 @@ class _MyHomePageState extends State<MyHomePage> {
         String nuevoJuego = "";
         int nuevoScore = 0;
         String nuevoEstado = "Playing"; 
+        String nuevoComentario= "";
         showDialog(
           context: context,
           builder: (context) {
@@ -210,6 +215,15 @@ class _MyHomePageState extends State<MyHomePage> {
                       }
                     },
                   ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: "Comentario(opcional)",
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLines: 2,
+                    onChanged: (value)=>nuevoComentario=value,
+                  )
                 ],
               ),
               actions: [
@@ -221,10 +235,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   onPressed: () {
                     if (nuevoJuego.isNotEmpty) {
                       setState(() {
-                        juegos.add(Juego(
+                        juegos.add(Game(
                           nombre: nuevoJuego,
                           score: nuevoScore.toString(),
                           estado: nuevoEstado,
+                          comentario:  nuevoComentario,
                         ));
                       });
                     }
