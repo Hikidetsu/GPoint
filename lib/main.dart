@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:gpoint/pages/my_home_page_state.dart';
-import 'package:logger/logger.dart';
 import 'package:gpoint/pages/splash.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('juegosBox');
   runApp(const MyApp());
 }
 
@@ -12,12 +15,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Gamer Point demo',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const Splash(),
+      home: Splash(), 
     );
   }
 }
