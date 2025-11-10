@@ -38,6 +38,10 @@ dependencies:
   hive_flutter: ^1.1.0
   http: ^1.5.0
   shared_preferences: ^2.5.3
+  image_picker: ^1.2.0
+  path_provider: ^2.1.5
+  permission_handler: ^12.0.1
+  flutter_local_notifications: ^19.5.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +74,7 @@ flutter:
    - assets/Gpoint.png
    - assets/Gsinfondo.png
    - assets/new1.png
+   - assets/placeholder.png
    
 
 
