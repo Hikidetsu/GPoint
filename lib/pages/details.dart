@@ -64,8 +64,8 @@ class _DetailsState extends State<Details> {
           );
         });
 
-        await _guardarJuegoLocal(); // 🔹 Guarda persistencia
-        Navigator.pop(context, juegoActual); // 🔹 Devuelve el juego actualizado
+        await _guardarJuegoLocal(); 
+        Navigator.pop(context, juegoActual); 
       }
     } catch (e) {
       debugPrint("Error al seleccionar imagen: $e");
