@@ -8,6 +8,7 @@ import 'package:gpoint/models/game.dart';
 import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:gpoint/pages/about.dart';
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -96,13 +97,23 @@ class _MyHomePageState extends State<MyHomePage> {
       _sortCriteria = prefs.getString('sortCriteria') ?? 'Nombre';
     });
   }
+
+
+  void _gotoAbout() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AboutPage()),
+    );
+  }
+  
+
   void _goToNews() {
     Navigator.push(context, MaterialPageRoute(builder: (context) => News()));
   }
   void _goToSearch() {
     Navigator.push(context, MaterialPageRoute(builder: (context) => Search()));
   }
-  Future<void> _goToAbout() async {
+  Future<void> _gotoConfig() async {
     await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => Settings()),
@@ -130,15 +141,21 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        centerTitle: true,
-        title:
-            Image.asset('assets/Gsinfondo.png', height: 40, fit: BoxFit.contain),
-        leading: IconButton(
-          icon: const Icon(Icons.settings),
-          onPressed: _goToAbout,
-        ),
+      backgroundColor: Theme.of(context).colorScheme.inversePrimary,
+      centerTitle: true,
+      title: Image.asset('assets/Gsinfondo.png', height: 40, fit: BoxFit.contain),
+      leading: IconButton(
+        icon: const Icon(Icons.settings),
+        onPressed: _gotoConfig, 
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.info_outline),
+          tooltip: 'Acerca de',
+          onPressed: _gotoAbout, 
+        ),
+      ],
+    ),
       body: Column(
         children: [
           Container(
@@ -170,7 +187,16 @@ class _MyHomePageState extends State<MyHomePage> {
       bottomNavigationBar: _buildBottomNavBar(),
     );
   }
-  Widget _buildGridView(List<Game> juegosOrdenados) {
+    Widget _buildGridView(List<Game> juegosOrdenados) {
+    double imageSize;
+    if (_coverSize == 'Grandes') {
+      imageSize = 180;
+    } else if (_coverSize == 'Pequeñas') {
+      imageSize = 100;
+    } else {
+      imageSize = 140; 
+    }
+
     return GridView.builder(
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -206,7 +232,11 @@ class _MyHomePageState extends State<MyHomePage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildGameImage(juego),
+                SizedBox(
+                  height: imageSize,
+                  width: imageSize,
+                  child: _buildGameImage(juego),
+                ),
                 const SizedBox(height: 8),
                 Text(juego.nombre,
                     style: const TextStyle(
@@ -219,7 +249,17 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
+
   Widget _buildListView(List<Game> juegosOrdenados) {
+    double imageSize;
+    if (_coverSize == 'Grandes') {
+      imageSize = 80;
+    } else if (_coverSize == 'Pequeñas') {
+      imageSize = 40;
+    } else {
+      imageSize = 60; 
+    }
+
     return ListView.builder(
       itemCount: juegosOrdenados.length,
       itemBuilder: (context, index) {
@@ -230,8 +270,8 @@ class _MyHomePageState extends State<MyHomePage> {
           margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           child: ListTile(
             leading: SizedBox(
-              width: 60,
-              height: 60,
+              width: imageSize,
+              height: imageSize,
               child: _buildGameImage(juego),
             ),
             title: Text(juego.nombre),
@@ -241,7 +281,8 @@ class _MyHomePageState extends State<MyHomePage> {
               final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
-                    builder: (context) => Details(juego: juego, index: origIndex)),
+                    builder: (context) =>
+                        Details(juego: juego, index: origIndex)),
               );
               if (result == "delete") {
                 setState(() {
@@ -260,6 +301,7 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
+
   Widget _buildGameImage(Game juego) {
     if (juego.imagen == null) {
       return const Icon(Icons.videogame_asset);
@@ -284,9 +326,12 @@ class _MyHomePageState extends State<MyHomePage> {
         String nuevoEstado = "Playing"; 
         String nuevoComentario = "";
 
-        showDialog(
-          context: context,
-          builder: (context) {
+            showDialog(
+      context: context,
+      builder: (context) {
+        String nuevoEstadoLocal = nuevoEstado; 
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
             return AlertDialog(
               title: const Text("Agregar Juego"),
               content: Column(
@@ -312,7 +357,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                   const SizedBox(height: 12),
                   DropdownButton<String>(
-                    value: nuevoEstado,
+                    value: nuevoEstadoLocal,
                     isExpanded: true,
                     items: ["Playing", "Played", "Interested", "Dropped"]
                         .map((estado) => DropdownMenuItem(
@@ -322,7 +367,9 @@ class _MyHomePageState extends State<MyHomePage> {
                         .toList(),
                     onChanged: (value) {
                       if (value != null) {
-                        nuevoEstado = value;
+                        setStateDialog(() {
+                          nuevoEstadoLocal = value;
+                        });
                       }
                     },
                   ),
@@ -349,7 +396,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         juegos.add(Game(
                           nombre: nuevoJuego,
                           score: nuevoScore.toString(),
-                          estado: nuevoEstado,
+                          estado: nuevoEstadoLocal,
                           comentario: nuevoComentario,
                         ));
                       });
@@ -363,6 +410,9 @@ class _MyHomePageState extends State<MyHomePage> {
             );
           },
         );
+      },
+    );
+
       },
       tooltip: 'Agregar',
       child: const Icon(Icons.add),

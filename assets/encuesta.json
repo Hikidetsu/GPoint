@@ -1,0 +1,101 @@
+{
+  "titulo": "Encuesta de satisfacción y feedback",
+  "secciones": [
+    {
+      "titulo": "1. Datos del usuario",
+      "preguntas": [
+        {
+          "id": 1,
+          "tipo": "texto",
+          "pregunta": "Nombre (opcional)",
+          "icono": "person",
+          "obligatorio": false
+        },
+        {
+          "id": 2,
+          "tipo": "texto",
+          "pregunta": "Correo electrónico (obligatorio)",
+          "icono": "email",
+          "obligatorio": true
+        }
+      ]
+    },
+    {
+      "titulo": "2. Uso y calificación",
+      "descripcion": "Cada pregunta se responde con una escala del 1 al 5.",
+      "preguntas": [
+        {
+          "id": 3,
+          "tipo": "slider",
+          "pregunta": "¿Qué valor le darías a la aplicación en un término general?",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "id": 4,
+          "tipo": "slider",
+          "pregunta": "¿Qué tan sencillo es de usar la aplicación?",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "id": 5,
+          "tipo": "slider",
+          "pregunta": "¿En qué medida la aplicación cumplió con tu necesidad?",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "id": 6,
+          "tipo": "slider",
+          "pregunta": "¿En qué medida consideras que la interfaz es cómoda de usar?",
+          "min": 1,
+          "max": 5
+        }
+      ]
+    },
+    {
+      "titulo": "3. Opiniones",
+      "preguntas": [
+        {
+          "id": 7,
+          "tipo": "texto_largo",
+          "pregunta": "¿Qué consideras que fue lo peor de la aplicación y lo mejor?"
+        },
+        {
+          "id": 8,
+          "tipo": "texto_largo",
+          "pregunta": "¿Qué aspecto consideras que se debería de mejorar?"
+        },
+        {
+          "id": 9,
+          "tipo": "texto_largo",
+          "pregunta": "¿Qué funciones esperabas en la aplicación que estuvieran disponibles?"
+        }
+      ]
+    },
+    {
+      "titulo": "4. Veredicto final",
+      "preguntas": [
+        {
+          "id": 10,
+          "tipo": "booleano",
+          "pregunta": "¿Se la recomendarías a tus amigos?",
+          "opciones": ["Sí", "No"]
+        },
+        {
+          "id": 11,
+          "tipo": "estrellas",
+          "pregunta": "¿Cuántas estrellas le darías?",
+          "min": 1,
+          "max": 5
+        },
+        {
+          "id": 12,
+          "tipo": "texto_largo",
+          "pregunta": "Opinión extra (opcional)"
+        }
+      ]
+    }
+  ]
+}

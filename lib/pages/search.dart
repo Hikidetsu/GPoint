@@ -3,50 +3,62 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 class Search extends StatefulWidget {
-  const Search({Key? key}) : super(key: key);
+  const Search({super.key});
 
   @override
   State<Search> createState() => _SearchState();
 }
 
 class _SearchState extends State<Search> {
-  final List<String> allGames = ["Silksong", "Larry", "LeapGalaxy"];
-  List<String> filteredGames = [];
+  List<dynamic> _games = [];
+  bool _isLoading = false;
+  final TextEditingController _controller = TextEditingController();
 
-  @override
-  void initState() {
-    super.initState();
-    filteredGames = allGames;
-  }
+  Future<void> _searchGames(String query) async {
+    if (query.isEmpty) return;
 
-  Future<List<dynamic>> fetchGames() async {
-    final url = Uri.parse('https://www.freetogame.com/api/games');
+    setState(() {
+      _isLoading = true;
+      _games = [];
+    });
+
+    final url = Uri.parse(
+        'https://api.rawg.io/api/games?key=b07bda41b1374abb95cbe687ff0698ce&search=$query&page_size=20');
+
     try {
       final response = await http.get(url);
       if (response.statusCode == 200) {
-        return json.decode(response.body);
+        final Map<String, dynamic> data = json.decode(response.body);
+        if (mounted) {
+          setState(() {
+            _games = data['results'];
+            _isLoading = false;
+          });
+        }
       } else {
-        throw Exception('Error al cargar los juegos: ${response.statusCode}');
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+          _showErrorDialog('Error en el servidor: ${response.statusCode}');
+        }
       }
     } catch (e) {
-      throw Exception('Error de conexión: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showErrorDialog('Error de conexión');
+      }
     }
   }
 
-  void _filterGames(String query) {
-    setState(() {
-      filteredGames = allGames
-          .where((game) => game.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    });
-  }
-
-  void _onSelectGame(String game) {
+  void _showErrorDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Error"),
-        content: Text("No existe información de $game por el momento."),
+        title: const Text("Aviso"),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -57,10 +69,27 @@ class _SearchState extends State<Search> {
     );
   }
 
-  void _goToApiGames() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const GameListScreen()),
+  void _onSelectGame(Map<String, dynamic> game) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(game['name']),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("Rating: ${game['rating'] ?? 'N/A'}"),
+            const SizedBox(height: 8),
+            Text("Lanzamiento: ${game['released'] ?? 'N/A'}"),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cerrar"),
+          ),
+        ],
+      ),
     );
   }
 
@@ -68,99 +97,71 @@ class _SearchState extends State<Search> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Buscar'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.cloud_download),
-            tooltip: "Ver juegos desde API",
-            onPressed: _goToApiGames,
-          ),
-        ],
+        title: const Text('Buscar en RAWG'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          children: [
-            TextField(
-              decoration: const InputDecoration(
-                labelText: "Buscar",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: _filterGames,
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              child: ListView.builder(
-                itemCount: filteredGames.length,
-                itemBuilder: (context, index) {
-                  final game = filteredGames[index];
-                  return ListTile(
-                    title: Text(game),
-                    onTap: () => _onSelectGame(game),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
-class GameListScreen extends StatelessWidget {
-  const GameListScreen({super.key});
-
-  Future<List<dynamic>> fetchGames() async {
-    final url = Uri.parse('https://www.freetogame.com/api/games');
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        throw Exception('Error al cargar los juegos: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error de conexión: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Juegos FreeToGame')),
-      body: FutureBuilder<List<dynamic>>(
-        future: fetchGames(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (snapshot.hasData) {
-            final games = snapshot.data!;
-            return ListView.builder(
-              itemCount: games.length,
-              itemBuilder: (context, index) {
-                final game = games[index];
-                return ListTile(
-                  leading: Image.network(
-                    game['thumbnail'],
-                    width: 60,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(Icons.image),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Column(
+            children: [
+              TextField(
+                controller: _controller,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: "Escribe un juego...",
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _controller.clear();
+                      setState(() {
+                        _games = [];
+                      });
+                    },
                   ),
-                  title: Text(game['title']),
-                  subtitle: Text(game['genre']),
-                );
-              },
-            );
-          } else {
-            return const Center(child: Text('No hay juegos disponibles.'));
-          }
-        },
+                ),
+                onSubmitted: _searchGames,
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : _games.isEmpty
+                        ? const Center(
+                            child: Text(
+                                "Ingresa un nombre y busca para ver resultados."))
+                        : ListView.builder(
+                            itemCount: _games.length,
+                            itemBuilder: (context, index) {
+                              final game = _games[index];
+                              final String? imageUrl = game['background_image'];
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                child: ListTile(
+                                  leading: imageUrl != null
+                                      ? Image.network(
+                                          imageUrl,
+                                          width: 60,
+                                          height: 60,
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) =>
+                                              const Icon(Icons.videogame_asset),
+                                        )
+                                      : const Icon(Icons.videogame_asset,
+                                          size: 60),
+                                  title: Text(game['name']),
+                                  subtitle: Text(
+                                      "Rating: ${game['rating'] ?? '0.0'}"),
+                                  onTap: () => _onSelectGame(game),
+                                ),
+                              );
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

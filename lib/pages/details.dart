@@ -129,86 +129,99 @@ class _DetailsState extends State<Details> {
               String nuevoComentario = juegoActual.comentario ?? "";
 
               showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: const Text("Editar Juego"),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Nombre del juego",
-                            border: OutlineInputBorder(),
-                          ),
-                          controller: TextEditingController(text: nuevoNombre),
-                          onChanged: (value) => nuevoNombre = value,
-                        ),
-                        const SizedBox(height: 12),
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Score (1-10)",
-                            border: OutlineInputBorder(),
-                          ),
-                          controller: TextEditingController(text: nuevoScore),
-                          keyboardType: TextInputType.number,
-                          onChanged: (value) => nuevoScore = value,
-                        ),
-                        const SizedBox(height: 12),
-                        DropdownButton<String>(
-                          value: nuevoEstado,
-                          isExpanded: true,
-                          items: ["Playing", "Played", "Interested", "Dropped"]
-                              .map((estado) => DropdownMenuItem(
-                                    value: estado,
-                                    child: Text(estado),
-                                  ))
-                              .toList(),
-                          onChanged: (value) {
-                            if (value != null) nuevoEstado = value;
-                          },
-                        ),
-                        TextField(
-                          decoration: const InputDecoration(
-                            labelText: "Comentario (opcional)",
-                            border: OutlineInputBorder(),
-                          ),
-                          controller: TextEditingController(text: nuevoComentario),
-                          maxLines: 2,
-                          onChanged: (value) => nuevoComentario = value,
-                        ),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context),
-                        child: const Text("Cancelar"),
-                      ),
-                      ElevatedButton(
-                        onPressed: () async {
-                          Navigator.pop(context);
-                          final nuevoJuego = Game(
-                            nombre: nuevoNombre,
-                            score: nuevoScore,
-                            estado: nuevoEstado,
-                            imagen: juegoActual.imagen,
-                            comentario:
-                                nuevoComentario.isNotEmpty ? nuevoComentario : null,
-                            genero: juegoActual.genero,
-                            plataforma: juegoActual.plataforma,
-                            sinopsis: juegoActual.sinopsis,
-                          );
+              context: context,
+              builder: (context) {
+                String nuevoNombre = juegoActual.nombre;
+                String nuevoScore = juegoActual.score;
+                String nuevoEstado = juegoActual.estado;
+                String nuevoComentario = juegoActual.comentario ?? "";
 
-                          setState(() => juegoActual = nuevoJuego);
-                          await _guardarJuegoLocal();
-                          Navigator.pop(context, nuevoJuego);
-                        },
-                        child: const Text("Guardar"),
-                      ),
-                    ],
-                  );
-                },
-              );
+                return AlertDialog(
+                  title: const Text("Editar Juego"),
+                  content: StatefulBuilder(
+                    builder: (context, setStateDialog) {
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          TextField(
+                            decoration: const InputDecoration(
+                              labelText: "Nombre del juego",
+                              border: OutlineInputBorder(),
+                            ),
+                            controller: TextEditingController(text: nuevoNombre),
+                            onChanged: (value) => nuevoNombre = value,
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            decoration: const InputDecoration(
+                              labelText: "Score (1-10)",
+                              border: OutlineInputBorder(),
+                            ),
+                            controller: TextEditingController(text: nuevoScore),
+                            keyboardType: TextInputType.number,
+                            onChanged: (value) => nuevoScore = value,
+                          ),
+                          const SizedBox(height: 12),
+                          DropdownButton<String>(
+                            value: nuevoEstado,
+                            isExpanded: true,
+                            items: ["Playing", "Played", "Interested", "Dropped"]
+                                .map((estado) => DropdownMenuItem(
+                                      value: estado,
+                                      child: Text(estado),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              if (value != null) {
+                                setStateDialog(() {
+                                  nuevoEstado = value; // Actualiza el dropdown en tiempo real
+                                });
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            decoration: const InputDecoration(
+                              labelText: "Comentario (opcional)",
+                              border: OutlineInputBorder(),
+                            ),
+                            controller: TextEditingController(text: nuevoComentario),
+                            maxLines: 2,
+                            onChanged: (value) => nuevoComentario = value,
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancelar"),
+                    ),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final nuevoJuego = Game(
+                          nombre: nuevoNombre,
+                          score: nuevoScore,
+                          estado: nuevoEstado,
+                          imagen: juegoActual.imagen,
+                          comentario: nuevoComentario.isNotEmpty ? nuevoComentario : null,
+                          genero: juegoActual.genero,
+                          plataforma: juegoActual.plataforma,
+                          sinopsis: juegoActual.sinopsis,
+                        );
+
+                        setState(() => juegoActual = nuevoJuego);
+                        await _guardarJuegoLocal();
+                        Navigator.pop(context, nuevoJuego);
+                      },
+                      child: const Text("Guardar"),
+                    ),
+                  ],
+                );
+              },
+            );
+
             },
           ),
           IconButton(

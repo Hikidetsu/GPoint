@@ -42,6 +42,7 @@ dependencies:
   path_provider: ^2.1.5
   permission_handler: ^12.0.1
   flutter_local_notifications: ^19.5.0
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
@@ -75,6 +76,7 @@ flutter:
    - assets/Gsinfondo.png
    - assets/new1.png
    - assets/placeholder.png
+   - assets/encuesta.json
    
 
 
