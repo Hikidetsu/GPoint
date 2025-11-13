@@ -13,33 +13,41 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 - La aplicacion permite editar la informacion añadida.
 - La aplicacion permite visualizar la cantidad de entradas añadidas.
 - La aplicacion permite eliminar una entrada.
-- La aplicacion puede contar con las caratulas de los juegos que se añadan.
-- La aplicacion cuenta con la pantalla de "Inicio", "Noticias" "Acerca de" y "Buscar.
-- La pantalla principal debe contar con juegos en general y diversas entrdas de mi interes.
-- La pantalla de buscar permite buscar juegos y otros.
-- La pantalla de Noticias permite al usuario visualizar noticias que sube la comunidad.
-
-
+- La aplicacion puede contar con las caratulas de los juegos que se añada de manera manual.
+- La aplicacion cuenta con la pantalla de "Inicio", "Noticias" "Acerca de" ,"Buscar" y "Configuraciones.
+- La pantalla principal cuenta con la lista de juegos que el usuario agrega.
+- La pantalla de buscar permite buscar juegos de la base de datos RAWG e importarlos a la lista.
+- La pantalla de Noticias permite al usuario visualizar noticias.
+- La aplicación permite añadir juegos manualmente o usando un autocompletado de la API de RAWG.
+- La aplicación rellena automáticamente la sinopsis, portada, género y plataformas si se usa la API.
+- La aplicación pide confirmación ("¿Estás seguro?") antes de eliminar una entrada.
+- La aplicación envía recordatorios inteligentes para juegos en estado "Jugando" o "Interesado".
+- El usuario puede activar o desactivar los recordatorios con un interruptor general.
+- El usuario puede configurar la frecuencia de los recordatorios (7, 14, 21 o 30 días).
+- La aplicación maneja los permisos de Android 16 (Alarmas Exactas) para que las notificaciones funcionen.
+- La aplicación cuenta con botones de prueba para verificar las notificaciones (inmediata y 10 seg).
+- El usuario puede cambiar la visualización de la lista (Cuadrícula/Lista), el tamaño de portadas y el orden.
+- La aplicación cuenta con una Base de Datos Rápida (Hive) para funcionar sin conexión.
 
 
 ```mermaid
 
 stateDiagram-v2
     [*] --> Pantalla_Principal
-    Pantalla_Principal--> Pantalla_Notificaciones
-    Pantalla_Notificaciones-->Pantalla_Principal
-    Pantalla_Notificaciones-->Noticias
-    Pantalla_Principal-->Pantalla_Perfil
-    Pantalla_Perfil-->Pantalla_Principal
-    Pantalla_Principal-->Pantalla_Buscar
-    Pantalla_Buscar-->videojuego
-    Pantalla_Buscar-->Pantalla_Principal
-    Pantalla_Principal-->Mi_lista
-    Mi_lista-->Pantalla_Principal
-    Mi_lista-->añadir_Videojuego
-    añadir_Videojuego-->Agregar_Calificacion
-    añadir_Videojuego-->Agregar_Estado
-    añadir_Videojuego-->Agregar_Opinion
+    Pantalla_Principal--> Pantalla_Noticias
+    Pantalla_Principal-->Pantalla_Busqueda
+    Pantalla_Principal-->Pantalla_Configuraciones
+    Pantalla_Principal-->Pantalla_Acerca
+    Pantalla_Principal-->Agregar_Juego
+    Agregar_Juego-->Pantalla_Principal
+    Mi_Lista-->Pantalla_Principal
+    Agregar_Juego-->Mi_Lista
+    Pantalla_Busqueda-->Agregar_Juego
+    Pantalla_Acerca-->Encuesta
+    Pantalla_Acerca-->Info_Creador
+    Pantalla_Configuraciones-->Visualizacion
+    Pantalla_Configuraciones-->Notificaciones
+        
  
 
 ```
