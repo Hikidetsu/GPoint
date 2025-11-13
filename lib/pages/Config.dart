@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hive/hive.dart';
@@ -20,9 +21,13 @@ class _SettingsState extends State<Settings> {
   String _coverSize = 'Medianas';
   String _sortCriteria = 'Nombre';
 
+  bool _enableNotifications = true; 
   int _playingReminderDays = 7;
   int _interestedReminderDays = 14;
   final List<int> _optionsDays = [7, 14, 21, 30];
+
+  int _countdownSeconds = 0;
+  Timer? _timer;
 
   @override
   void initState() {
@@ -31,38 +36,30 @@ class _SettingsState extends State<Settings> {
     _loadSettings();
   }
 
-  Future<void> _initializeNotifications() async {
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('America/Santiago'));
-
-    if (await Permission.notification.isDenied) {
-      await Permission.notification.request();
-    }
-
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
-
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-    await _createNotificationChannels();
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
-  Future<void> _createNotificationChannels() async {
-    const AndroidNotificationChannel gamesChannel = AndroidNotificationChannel(
-      'games_channel',
-      'Recordatorios de juegos',
-      description: 'Canal para recordatorios de juegos',
-      importance: Importance.max,
-    );
+  Future<void> _initializeNotifications() async {
+    tz.initializeTimeZones();
+    try {
+      tz.setLocalLocation(tz.getLocation('America/Santiago'));
+    } catch (e) {
+      tz.setLocalLocation(tz.UTC);
+    }
 
-    const AndroidNotificationChannel testChannel = AndroidNotificationChannel(
-      'test_channel',
-      'Pruebas',
-      description: 'Canal para pruebas',
+    await Permission.notification.request();
+    await Permission.scheduleExactAlarm.request();
+
+    const AndroidNotificationChannel gamesChannel = AndroidNotificationChannel(
+      'games_channel_v3',
+      'Recordatorios de juegos',
+      description: 'Notificaciones importantes de tus juegos',
       importance: Importance.max,
+      playSound: true,
+      enableVibration: true,
     );
 
     final androidPlugin = flutterLocalNotificationsPlugin
@@ -70,7 +67,6 @@ class _SettingsState extends State<Settings> {
             AndroidFlutterLocalNotificationsPlugin>();
 
     await androidPlugin?.createNotificationChannel(gamesChannel);
-    await androidPlugin?.createNotificationChannel(testChannel);
   }
 
   Future<void> _loadSettings() async {
@@ -79,6 +75,7 @@ class _SettingsState extends State<Settings> {
       _listStyle = prefs.getString('listStyle') ?? 'Grid';
       _coverSize = prefs.getString('coverSize') ?? 'Medianas';
       _sortCriteria = prefs.getString('sortCriteria') ?? 'Nombre';
+      _enableNotifications = prefs.getBool('enableNotifications') ?? true;
       _playingReminderDays = prefs.getInt('playingReminderDays') ?? 7;
       _interestedReminderDays = prefs.getInt('interestedReminderDays') ?? 14;
     });
@@ -89,6 +86,7 @@ class _SettingsState extends State<Settings> {
     await prefs.setString('listStyle', _listStyle);
     await prefs.setString('coverSize', _coverSize);
     await prefs.setString('sortCriteria', _sortCriteria);
+    await prefs.setBool('enableNotifications', _enableNotifications);
     await prefs.setInt('playingReminderDays', _playingReminderDays);
     await prefs.setInt('interestedReminderDays', _interestedReminderDays);
     _scheduleGameNotifications();
@@ -115,65 +113,116 @@ class _SettingsState extends State<Settings> {
     }
   }
 
+  void _startCountdown() {
+    setState(() => _countdownSeconds = 10);
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_countdownSeconds > 0) {
+        setState(() => _countdownSeconds--);
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
   Future<void> _scheduleGameNotifications({bool testMode = false}) async {
-    if (testMode) {
-      debugPrint("--- INICIANDO PRUEBA DE RECORDATORIOS ---");
-    } else {
-      debugPrint("--- Programando recordatorios normales... ---");
-    }
-
-    await flutterLocalNotificationsPlugin.cancelAll();
-    debugPrint("Notificaciones anteriores canceladas.");
-
-    final box = Hive.box('juegosBox');
-    final dynamic juegosList = box.get('juegos');
-
-    if (juegosList == null || juegosList is! List || juegosList.isEmpty) {
-      debugPrint("!!! ERROR: No se encontraron juegos en Hive ('juegos' vacío o nulo).");
+    // Si las notificaciones están desactivadas y NO es una prueba manual, cancelamos todo y salimos
+    if (!_enableNotifications && !testMode) {
+      await flutterLocalNotificationsPlugin.cancelAll();
       return;
     }
 
-    final juegos = (juegosList as List)
+    bool canExact = await Permission.scheduleExactAlarm.isGranted;
+
+    if (testMode) {
+      if (!canExact) {
+        await Permission.scheduleExactAlarm.request();
+        canExact = await Permission.scheduleExactAlarm.isGranted;
+        if (!canExact && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+              content: Text("Habilita 'Alarmas y recordatorios' en Ajustes")));
+          openAppSettings();
+          return;
+        }
+      }
+      _startCountdown();
+    }
+
+    await flutterLocalNotificationsPlugin.cancelAll();
+
+    // Si están desactivadas globalmente, no reprogramamos nada (salvo que sea testMode arriba)
+    if (!_enableNotifications && !testMode) return;
+
+    final box = Hive.box('juegosBox');
+    final dynamic juegosList = box.get('juegos');
+    if (juegosList == null || juegosList is! List || juegosList.isEmpty) {
+      return;
+    }
+
+    final juegos = (juegosList)
         .map((item) => Game.fromMap(Map<String, dynamic>.from(item)))
         .toList();
 
     int id = 0;
-    int programados = 0;
+    int count = 0;
 
     for (var juego in juegos) {
       if (juego.estado == 'Playing' || juego.estado == 'Interested') {
-        programados++;
+        count++;
         final isPlaying = juego.estado == 'Playing';
         final days = isPlaying ? _playingReminderDays : _interestedReminderDays;
-        final message = isPlaying
-            ? 'Sigue jugando ${juego.nombre}!'
-            : 'Revisa ${juego.nombre}, estás interesado!';
+        final msg = isPlaying ? 'Sigue jugando ${juego.nombre}' : 'Revisa ${juego.nombre}';
 
         final scheduledTime = testMode
             ? tz.TZDateTime.now(tz.local).add(const Duration(seconds: 10))
             : tz.TZDateTime.now(tz.local).add(Duration(days: days));
 
-        if (scheduledTime.isAfter(tz.TZDateTime.now(tz.local))) {
+        try {
           await flutterLocalNotificationsPlugin.zonedSchedule(
             id++,
-            'Recordatorio de juego',
-            message,
+            'Gamer Point',
+            msg,
             scheduledTime,
             const NotificationDetails(
               android: AndroidNotificationDetails(
-                'games_channel',
+                'games_channel_v3',
                 'Recordatorios de juegos',
                 importance: Importance.max,
                 priority: Priority.high,
+                fullScreenIntent: true,
               ),
             ),
-            androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+            androidScheduleMode: testMode 
+                ? AndroidScheduleMode.alarmClock 
+                : AndroidScheduleMode.exactAllowWhileIdle,
           );
+        } catch (e) {
+          debugPrint("Error programando: $e");
         }
       }
     }
 
-    debugPrint("--- TOTAL PROGRAMADAS: $programados ---");
+    if (mounted && testMode) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Programadas $count notificaciones')),
+      );
+    }
+  }
+
+  Future<void> _testImmediateNotification() async {
+    await flutterLocalNotificationsPlugin.show(
+      9999,
+      'Prueba Inmediata',
+      'Si ves esto, las notificaciones funcionan.',
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'games_channel_v3',
+          'Pruebas',
+          importance: Importance.max,
+          priority: Priority.high,
+        ),
+      ),
+    );
   }
 
   @override
@@ -186,141 +235,111 @@ class _SettingsState extends State<Settings> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // Ajustes de visualización
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Ajustes de visualización",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
+                    const Text("Ajustes de visualización", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    const Text("Forma de la lista:"),
-                    DropdownButton<String>(
-                      value: _listStyle,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'Grid', child: Text('Cuadrícula')),
-                        DropdownMenuItem(value: 'Lista', child: Text('Lista')),
-                        DropdownMenuItem(value: 'Compacta', child: Text('Compacta')),
-                      ],
-                      onChanged: _onListStyleChanged,
-                    ),
+                    _buildDropdown("Forma de la lista:", _listStyle, ['Grid', 'Lista', 'Compacta'], _onListStyleChanged),
                     const SizedBox(height: 12),
-                    const Text("Tamaño de las carátulas:"),
-                    DropdownButton<String>(
-                      value: _coverSize,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'Grandes', child: Text('Grandes')),
-                        DropdownMenuItem(value: 'Medianas', child: Text('Medianas')),
-                        DropdownMenuItem(value: 'Pequeñas', child: Text('Pequeñas')),
-                      ],
-                      onChanged: _onCoverSizeChanged,
-                    ),
+                    _buildDropdown("Tamaño de las carátulas:", _coverSize, ['Grandes', 'Medianas', 'Pequeñas'], _onCoverSizeChanged),
                     const SizedBox(height: 12),
-                    const Text("Criterio de ordenamiento:"),
-                    DropdownButton<String>(
-                      value: _sortCriteria,
-                      isExpanded: true,
-                      items: const [
-                        DropdownMenuItem(value: 'Nombre', child: Text('Por nombre')),
-                        DropdownMenuItem(
-                            value: 'Fecha', child: Text('Por fecha de agregado')),
-                        DropdownMenuItem(
-                            value: 'Puntuación', child: Text('Por puntuación')),
-                      ],
-                      onChanged: _onSortCriteriaChanged,
-                    ),
+                    _buildDropdown("Criterio de ordenamiento:", _sortCriteria, ['Nombre', 'Fecha', 'Puntuación'], _onSortCriteriaChanged),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
-            // Recordatorios
+            
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Recordatorios de juegos",
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Recordatorios de juegos", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        Switch(
+                          value: _enableNotifications,
+                          onChanged: (value) {
+                            setState(() {
+                              _enableNotifications = value;
+                            });
+                            _saveSettings();
+                          },
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 12),
-                    const Text("Para juegos en 'Playing':"),
-                    DropdownButton<int>(
-                      value: _playingReminderDays,
-                      isExpanded: true,
-                      items: _optionsDays
-                          .map((e) => DropdownMenuItem(
-                                value: e,
-                                child: Text('$e días'),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _playingReminderDays = value);
-                          _saveSettings();
-                        }
-                      },
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    
+                    // Opciones deshabilitadas si el switch está apagado
+                    Opacity(
+                      opacity: _enableNotifications ? 1.0 : 0.5,
+                      child: Column(
+                        children: [
+                          _buildIntDropdown(
+                            "Para juegos en 'Playing':", 
+                            _playingReminderDays, 
+                            _optionsDays, 
+                            _enableNotifications ? (val) {
+                               if(val != null) { setState(() => _playingReminderDays = val); _saveSettings(); }
+                            } : null
+                          ),
+                          const SizedBox(height: 12),
+                          _buildIntDropdown(
+                            "Para juegos en 'Interested':", 
+                            _interestedReminderDays, 
+                            _optionsDays, 
+                            _enableNotifications ? (val) {
+                               if(val != null) { setState(() => _interestedReminderDays = val); _saveSettings(); }
+                            } : null
+                          ),
+                        ],
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    const Text("Para juegos en 'Interested':"),
-                    DropdownButton<int>(
-                      value: _interestedReminderDays,
-                      isExpanded: true,
-                      items: _optionsDays
-                          .map((e) => DropdownMenuItem(
-                                value: e,
-                                child: Text('$e días'),
-                              ))
-                          .toList(),
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _interestedReminderDays = value);
-                          _saveSettings();
-                        }
-                      },
+
+                    const SizedBox(height: 20),
+                    
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: _testImmediateNotification,
+                        child: const Text("Prueba Inmediata (Check)"),
+                      ),
                     ),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () async {
-                        if (await Permission.notification.isGranted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Programando recordatorios de prueba... ¡llegarán en 10 segundos!'),
-                              duration: Duration(seconds: 3),
-                            ),
-                          );
-                          await _scheduleGameNotifications(testMode: true);
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                  'Permiso de notificación no otorgado'),
-                            ),
-                          );
-                        }
-                      },
-                      child: const Text("Probar recordatorios (10 seg)"),
+                    const SizedBox(height: 8),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _countdownSeconds > 0 
+                            ? null 
+                            : () async {
+                                if (await Permission.notification.request().isGranted) {
+                                  await _scheduleGameNotifications(testMode: true);
+                                } else {
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text("Falta permiso de notificación")),
+                                    );
+                                  }
+                                }
+                              },
+                        child: Text(_countdownSeconds > 0 
+                            ? "Esperando... ($_countdownSeconds)" 
+                            : "Probar recordatorios (10 seg)"),
+                      ),
                     ),
                   ],
                 ),
@@ -329,6 +348,25 @@ class _SettingsState extends State<Settings> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildDropdown(String label, String value, List<String> items, Function(String?) onChanged) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), DropdownButton<String>(value: value, isExpanded: true, items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(), onChanged: onChanged)]);
+  }
+
+  Widget _buildIntDropdown(String label, int value, List<int> items, Function(int?)? onChanged) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start, 
+      children: [
+        Text(label), 
+        DropdownButton<int>(
+          value: value, 
+          isExpanded: true, 
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text('$e días'))).toList(), 
+          onChanged: onChanged
+        )
+      ]
     );
   }
 }
