@@ -30,6 +30,9 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 - La aplicación cuenta con una Base de Datos Rápida (Hive) para funcionar sin conexión.
 
 
+- Link del apk
+- https://drive.google.com/file/d/1xGKzZd-igvOs6_ESg4GFwXM4rMVbqXmF/view?usp=sharing
+
 ```mermaid
 
 stateDiagram-v2
