@@ -12,6 +12,7 @@ import 'package:hive/hive.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gpoint/pages/about.dart';
+import 'package:intl/intl.dart';
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -22,11 +23,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _selectedIndex = 0;
+  int _selectedIndex = 1;
   String _Option = "All";
   String _listStyle = 'Grid';
   String _coverSize = 'Medianas';
   String _sortCriteria = 'Nombre';
+  String _selectedYear = 'Todas';
 
   List<Game> juegos = [];
 
@@ -40,6 +42,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void _loadJuegos() async {
     final box = Hive.box('juegosBox');
     final data = box.get('juegos');
+    final int nowTimestamp = DateTime.now().millisecondsSinceEpoch;
 
     if (data == null || (data as List).isEmpty) {
       juegos = [
@@ -52,15 +55,33 @@ class _MyHomePageState extends State<MyHomePage> {
           plataforma: "PC",
           sinopsis: "Juego clásico.",
           comentario: "Divertido.",
+          fechaInicio: "10/10/2023",
+          fechaTermino: "20/10/2023",
+          dateAddedTimestamp: nowTimestamp,
         ),
       ];
       await box.put('juegos', juegos.map((g) => g.toMap()).toList());
+      setState(() {});
     } else {
+      List<Game> loadedGames = [];
+      bool needsSave = false;
+
+      for (var item in (data as List)) {
+        final map = Map<String, dynamic>.from(item);
+        if (map['dateAddedTimestamp'] == null) {
+          map['dateAddedTimestamp'] = nowTimestamp;
+          needsSave = true;
+        }
+        loadedGames.add(Game.fromMap(map));
+      }
+
       setState(() {
-        juegos = (data as List)
-            .map((item) => Game.fromMap(Map<String, dynamic>.from(item)))
-            .toList();
+        juegos = loadedGames;
       });
+
+      if (needsSave) {
+        _saveJuegos();
+      }
     }
   }
 
@@ -75,6 +96,7 @@ class _MyHomePageState extends State<MyHomePage> {
       _listStyle = prefs.getString('listStyle') ?? 'Grid';
       _coverSize = prefs.getString('coverSize') ?? 'Medianas';
       _sortCriteria = prefs.getString('sortCriteria') ?? 'Nombre';
+      _selectedYear = prefs.getString('selectedYear') ?? 'Todas';
     });
   }
 
@@ -139,6 +161,17 @@ class _MyHomePageState extends State<MyHomePage> {
     return "";
   }
 
+  String? _extractYear(String? date) {
+    if (date != null && date.length >= 10) {
+      try {
+        return date.substring(date.length - 4);
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }
+
   void _mostrarDialogoAgregar() {
     String nombreJuego = "";
     String nuevoScore = "";
@@ -148,6 +181,10 @@ class _MyHomePageState extends State<MyHomePage> {
     String genero = "Varios";
     String plataforma = "Varios";
     String sinopsis = "";
+
+    final TextEditingController inicioDateController = TextEditingController();
+    final TextEditingController finDateController = TextEditingController();
+    final String today = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
     showDialog(
       context: context,
@@ -219,7 +256,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         setStateDialog(() {
                           nombreJuego = selection['name'];
                           imagenUrl = selection['background_image'];
-                          
+
                           final genresList = selection['genres'] as List?;
                           genero = (genresList != null && genresList.isNotEmpty)
                               ? genresList.map((g) => g['name']).join('/')
@@ -227,23 +264,26 @@ class _MyHomePageState extends State<MyHomePage> {
 
                           final platList = selection['platforms'] as List?;
                           plataforma = (platList != null && platList.isNotEmpty)
-                              ? platList.map((p) => p['platform']['name']).join(', ')
+                              ? platList
+                                  .map((p) => p['platform']['name'])
+                                  .join(', ')
                               : "PC";
-                          
+
                           sinopsis = "Cargando sinopsis...";
                         });
 
-                        String desc = await _fetchFullDescription(selection['id']);
+                        String desc =
+                            await _fetchFullDescription(selection['id']);
                         if (context.mounted) {
-                           setStateDialog(() {
-                             sinopsis = desc.isNotEmpty ? desc : "Sin sinopsis disponible.";
-                           });
+                          setStateDialog(() {
+                            sinopsis = desc.isNotEmpty
+                                ? desc
+                                : "Sin sinopsis disponible.";
+                          });
                         }
                       },
                     ),
-                    
                     const SizedBox(height: 12),
-                    
                     if (imagenUrl != null)
                       Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -251,18 +291,17 @@ class _MyHomePageState extends State<MyHomePage> {
                         width: double.infinity,
                         child: Image.network(imagenUrl!, fit: BoxFit.cover),
                       ),
-
                     if (sinopsis.isNotEmpty)
-                       Padding(
-                         padding: const EdgeInsets.only(bottom: 12.0),
-                         child: Text(
-                           sinopsis, 
-                           maxLines: 3, 
-                           overflow: TextOverflow.ellipsis,
-                           style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                         ),
-                       ),
-
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          sinopsis,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                              color: Colors.grey[600], fontSize: 12),
+                        ),
+                      ),
                     TextField(
                       decoration: const InputDecoration(
                         labelText: "Score (1-10)",
@@ -291,6 +330,34 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: inicioDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Inicio (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () {
+                            inicioDateController.text = today;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: finDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Término (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () {
+                            finDateController.text = today;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       decoration: const InputDecoration(
                         labelText: "Comentario (opcional)",
                         border: OutlineInputBorder(),
@@ -314,11 +381,17 @@ class _MyHomePageState extends State<MyHomePage> {
                           nombre: nombreJuego,
                           score: nuevoScore,
                           estado: nuevoEstado,
-                          comentario: nuevoComentario.isNotEmpty ? nuevoComentario : null,
+                          comentario: nuevoComentario.isNotEmpty
+                              ? nuevoComentario
+                              : null,
                           imagen: imagenUrl,
                           genero: genero,
                           plataforma: plataforma,
                           sinopsis: sinopsis,
+                          fechaInicio: inicioDateController.text,
+                          fechaTermino: finDateController.text,
+                          dateAddedTimestamp:
+                              DateTime.now().millisecondsSinceEpoch,
                         ));
                       });
                       _saveJuegos();
@@ -337,11 +410,39 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final juegosFiltados = _Option == "All"
+    final juegosFiltroEstado = _Option == "All"
         ? juegos
         : juegos.where((j) => j.estado == _Option).toList();
 
+    final juegosFiltados = juegosFiltroEstado.where((juego) {
+      if (_selectedYear == 'Todas') {
+        return true;
+      }
+      
+      String? yearInicio = _extractYear(juego.fechaInicio);
+      if (yearInicio == _selectedYear) {
+        return true;
+      }
+      
+      String? yearTermino = _extractYear(juego.fechaTermino);
+      if (yearTermino == _selectedYear) {
+        return true;
+      }
+      
+      return false;
+    }).toList();
+
     List<Game> juegosOrdenados = List.from(juegosFiltados);
+    
+    DateTime? _parseDate(String? dateStr) {
+      if (dateStr == null) return null;
+      try {
+        return DateFormat('dd/MM/yyyy').parse(dateStr);
+      } catch (e) {
+        return null;
+      }
+    }
+
     if (_sortCriteria == 'Nombre') {
       juegosOrdenados.sort(
           (a, b) => a.nombre.toLowerCase().compareTo(b.nombre.toLowerCase()));
@@ -352,13 +453,19 @@ class _MyHomePageState extends State<MyHomePage> {
         return aScore.compareTo(bScore);
       });
     } else if (_sortCriteria == 'Fecha') {
-      juegosOrdenados = juegosOrdenados.reversed.toList();
+      juegosOrdenados.sort((b, a) {
+         final aDate = _parseDate(a.fechaInicio) ?? DateTime(1900);
+         final bDate = _parseDate(b.fechaInicio) ?? DateTime(1900);
+         return aDate.compareTo(bDate);
+      });
     }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.inversePrimary,
         centerTitle: true,
-        title: Image.asset('assets/Gsinfondo.png', height: 40, fit: BoxFit.contain),
+        title:
+            Image.asset('assets/Gsinfondo.png', height: 40, fit: BoxFit.contain),
         leading: IconButton(
           icon: const Icon(Icons.settings),
           onPressed: _gotoConfig,
@@ -417,15 +524,21 @@ class _MyHomePageState extends State<MyHomePage> {
       imageSize = 140;
     }
 
+    final double cardHeight = imageSize + 8 + 20 + 20 + 8; 
+
     return GridView.builder(
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+      padding: const EdgeInsets.all(8.0),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
-        childAspectRatio: 0.9,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        mainAxisExtent: cardHeight,
       ),
       itemCount: juegosOrdenados.length,
       itemBuilder: (context, index) {
         final juego = juegosOrdenados[index];
         final origIndex = juegos.indexOf(juego);
+        final String gameYear = _extractYear(juego.fechaInicio) ?? "";
 
         return GestureDetector(
           onTap: () async {
@@ -448,20 +561,41 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           },
           child: Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            margin: EdgeInsets.zero,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12.0),
+            ),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 SizedBox(
                   height: imageSize,
-                  width: imageSize,
+                  width: double.infinity,
                   child: _buildGameImage(juego),
                 ),
-                const SizedBox(height: 8),
-                Text(juego.nombre,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 14)),
-                Text("Score: ${juego.score}"),
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        juego.nombre,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 14,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        gameYear.isNotEmpty ? "Score: ${juego.score} | $gameYear" : "Score: ${juego.score}",
+                        style: const TextStyle(fontSize: 12),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -485,6 +619,7 @@ class _MyHomePageState extends State<MyHomePage> {
       itemBuilder: (context, index) {
         final juego = juegosOrdenados[index];
         final origIndex = juegos.indexOf(juego);
+        final String gameYear = _extractYear(juego.fechaInicio) ?? "";
 
         return Card(
           margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -495,7 +630,7 @@ class _MyHomePageState extends State<MyHomePage> {
               child: _buildGameImage(juego),
             ),
             title: Text(juego.nombre),
-            subtitle: Text("Score: ${juego.score}"),
+            subtitle: Text(gameYear.isNotEmpty ? "Score: ${juego.score} | Inicio: $gameYear" : "Score: ${juego.score}"),
             trailing: Text(juego.estado),
             onTap: () async {
               final result = await Navigator.push(

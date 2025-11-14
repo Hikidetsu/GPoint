@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gpoint/models/game.dart';
+import 'package:intl/intl.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -14,7 +15,7 @@ class Search extends StatefulWidget {
 class _SearchState extends State<Search> {
   List<dynamic> _games = [];
   bool _isLoading = false;
-  bool _hasChanges = false; 
+  bool _hasChanges = false;
   final TextEditingController _controller = TextEditingController();
   final String _apiKey = 'b07bda41b1374abb95cbe687ff0698ce';
 
@@ -237,6 +238,10 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     String nuevoComentario = "";
     final String finalImage =
         _gameDetails!['background_image'] ?? widget.initialImage ?? "";
+    
+    final TextEditingController inicioDateController = TextEditingController();
+    final TextEditingController finDateController = TextEditingController();
+    final String today = DateFormat('dd/MM/yyyy').format(DateTime.now());
 
     showDialog(
       context: context,
@@ -288,6 +293,34 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: inicioDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Inicio (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () {
+                            inicioDateController.text = today;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: finDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Término (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () {
+                            finDateController.text = today;
+                          },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       decoration: const InputDecoration(
                         labelText: "Comentario (opcional)",
                         border: OutlineInputBorder(),
@@ -306,7 +339,13 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                 ElevatedButton(
                   onPressed: () {
                     _saveGameToHive(
-                        finalImage, nuevoScore, estadoLocal, nuevoComentario);
+                        finalImage, 
+                        nuevoScore, 
+                        estadoLocal, 
+                        nuevoComentario,
+                        inicioDateController.text,
+                        finDateController.text
+                    );
                     Navigator.pop(context);
                   },
                   child: const Text("Guardar"),
@@ -320,7 +359,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
   }
 
   void _saveGameToHive(
-      String image, String score, String status, String comment) async {
+      String image, String score, String status, String comment, String fechaInicio, String fechaTermino) async {
     final box = Hive.box('juegosBox');
     final List dynamicList = box.get('juegos', defaultValue: []);
 
@@ -351,6 +390,9 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
       sinopsis: synopsis,
       comentario: comment,
       imagen: image,
+      fechaInicio: fechaInicio,
+      fechaTermino: fechaTermino,
+      dateAddedTimestamp: DateTime.now().millisecondsSinceEpoch,
     );
 
     currentGames.add(newGame);

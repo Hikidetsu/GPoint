@@ -5,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gpoint/models/game.dart';
+import 'package:intl/intl.dart';
 
 class Details extends StatefulWidget {
   final Game juego;
@@ -114,14 +115,14 @@ class _DetailsState extends State<Details> {
             TextButton(
               child: const Text("Cancelar"),
               onPressed: () {
-                Navigator.of(context).pop(); 
+                Navigator.of(context).pop();
               },
             ),
             TextButton(
               child: const Text("Eliminar", style: TextStyle(color: Colors.red)),
               onPressed: () {
-                Navigator.of(context).pop(); 
-                Navigator.of(context).pop("delete"); 
+                Navigator.of(context).pop();
+                Navigator.of(context).pop("delete");
               },
             ),
           ],
@@ -135,6 +136,12 @@ class _DetailsState extends State<Details> {
     final scoreController = TextEditingController(text: juegoActual.score);
     final commentController =
         TextEditingController(text: juegoActual.comentario ?? "");
+    final inicioDateController =
+        TextEditingController(text: juegoActual.fechaInicio ?? "");
+    final finDateController =
+        TextEditingController(text: juegoActual.fechaTermino ?? "");
+    final String today = DateFormat('dd/MM/yyyy').format(DateTime.now());
+    
     String nuevoEstado = juegoActual.estado;
 
     showDialog(
@@ -184,6 +191,30 @@ class _DetailsState extends State<Details> {
                     ),
                     const SizedBox(height: 12),
                     TextField(
+                      controller: inicioDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Inicio (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () => inicioDateController.text = today,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: finDateController,
+                      decoration: InputDecoration(
+                        labelText: "Fecha de Término (dd/mm/aaaa)",
+                        border: const OutlineInputBorder(),
+                        suffixIcon: TextButton(
+                          child: const Text("Hoy"),
+                          onPressed: () => finDateController.text = today,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
                       controller: commentController,
                       decoration: const InputDecoration(
                         labelText: "Comentario (opcional)",
@@ -203,17 +234,19 @@ class _DetailsState extends State<Details> {
             ),
             ElevatedButton(
               onPressed: () async {
-                final nuevoJuego = Game(
+                final nuevoJuego = juegoActual.copyWith(
                   nombre: nameController.text,
                   score: scoreController.text,
                   estado: nuevoEstado,
-                  imagen: juegoActual.imagen,
                   comentario: commentController.text.isNotEmpty
                       ? commentController.text
                       : null,
-                  genero: juegoActual.genero,
-                  plataforma: juegoActual.plataforma,
-                  sinopsis: juegoActual.sinopsis,
+                  fechaInicio: inicioDateController.text.isNotEmpty 
+                      ? inicioDateController.text 
+                      : null,
+                  fechaTermino: finDateController.text.isNotEmpty 
+                      ? finDateController.text 
+                      : null,
                 );
 
                 setState(() {
@@ -222,7 +255,7 @@ class _DetailsState extends State<Details> {
                 });
 
                 await _guardarJuegoLocal();
-                if (mounted) Navigator.pop(context); 
+                if (mounted) Navigator.pop(context);
               },
               child: const Text("Guardar"),
             ),
@@ -235,7 +268,7 @@ class _DetailsState extends State<Details> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, 
+      canPop: false,
       onPopInvoked: (didPop) {
         if (didPop) return;
         Navigator.pop(context, juegoActual);
@@ -295,13 +328,20 @@ class _DetailsState extends State<Details> {
                     _buildInfoRow(
                         Icons.star, "Score", "${juegoActual.score}/10"),
                     const SizedBox(height: 8),
+                    _buildInfoRow(Icons.flag, "Estado", juegoActual.estado),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.calendar_today, "Inicio",
+                        juegoActual.fechaInicio ?? "N/A"),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(Icons.calendar_today_outlined, "Término",
+                        juegoActual.fechaTermino ?? "N/A"),
+                    const SizedBox(height: 8),
                     _buildInfoRow(Icons.category, "Género",
                         juegoActual.genero ?? "N/A"),
                     const SizedBox(height: 8),
                     _buildInfoRow(Icons.gamepad, "Plataformas",
                         juegoActual.plataforma ?? "N/A"),
-                    const SizedBox(height: 8),
-                    _buildInfoRow(Icons.flag, "Estado", juegoActual.estado),
+                    
                     const Divider(height: 30),
                     const Text(
                       "Sinopsis",

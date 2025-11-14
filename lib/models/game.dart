@@ -8,7 +8,10 @@ class Game {
   final String? plataforma;
   final String? sinopsis;
   final String? comentario;
-  final String? imagen; 
+  final String? imagen;
+  final String? fechaInicio;
+  final String? fechaTermino;
+  final int? dateAddedTimestamp;
 
   Game({
     required this.nombre,
@@ -19,6 +22,9 @@ class Game {
     this.sinopsis,
     this.comentario,
     this.imagen,
+    this.fechaInicio,
+    this.fechaTermino,
+    this.dateAddedTimestamp,
   });
 
   Map<String, dynamic> toMap() {
@@ -31,6 +37,9 @@ class Game {
       'sinopsis': sinopsis,
       'comentario': comentario,
       'imagen': imagen,
+      'fechaInicio': fechaInicio,
+      'fechaTermino': fechaTermino,
+      'dateAddedTimestamp': dateAddedTimestamp,
     };
   }
 
@@ -43,9 +52,13 @@ class Game {
       plataforma: map['plataforma'],
       sinopsis: map['sinopsis'],
       comentario: map['comentario'],
-      imagen: map['imagen'], 
+      imagen: map['imagen'],
+      fechaInicio: map['fechaInicio'],
+      fechaTermino: map['fechaTermino'],
+      dateAddedTimestamp: map['dateAddedTimestamp'],
     );
   }
+  
   String toJson() => json.encode(toMap());
 
   factory Game.fromJson(String source) => Game.fromMap(json.decode(source));
@@ -59,6 +72,9 @@ class Game {
     String? sinopsis,
     String? comentario,
     String? imagen,
+    String? fechaInicio,
+    String? fechaTermino,
+    int? dateAddedTimestamp,
   }) {
     return Game(
       nombre: nombre ?? this.nombre,
@@ -69,6 +85,9 @@ class Game {
       sinopsis: sinopsis ?? this.sinopsis,
       comentario: comentario ?? this.comentario,
       imagen: imagen ?? this.imagen,
+      fechaInicio: fechaInicio ?? this.fechaInicio,
+      fechaTermino: fechaTermino ?? this.fechaTermino,
+      dateAddedTimestamp: dateAddedTimestamp ?? this.dateAddedTimestamp,
     );
   }
 }
