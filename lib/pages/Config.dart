@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gpoint/models/game.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:gpoint/main.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class Settings extends StatefulWidget {
   const Settings({Key? key}) : super(key: key);
@@ -24,6 +27,7 @@ class _SettingsState extends State<Settings> {
   List<String> _availableYears = ['Todas'];
 
   bool _enableNotifications = true;
+  bool _autoSyncEnabled = false;
   int _playingReminderDays = 7;
   int _interestedReminderDays = 14;
   final List<int> _optionsDays = [7, 14, 21, 30];
@@ -31,11 +35,21 @@ class _SettingsState extends State<Settings> {
   int _countdownSeconds = 0;
   Timer? _timer;
 
+  User? _user;
+  bool _isSyncing = false;
+
   @override
   void initState() {
     super.initState();
     _initializeNotifications();
     _loadSettings();
+    _checkCurrentUser();
+  }
+
+  void _checkCurrentUser() {
+    setState(() {
+      _user = FirebaseAuth.instance.currentUser;
+    });
   }
 
   @override
@@ -80,6 +94,7 @@ class _SettingsState extends State<Settings> {
       _coverSize = prefs.getString('coverSize') ?? 'Medianas';
       _sortCriteria = prefs.getString('sortCriteria') ?? 'Nombre';
       _enableNotifications = prefs.getBool('enableNotifications') ?? true;
+      _autoSyncEnabled = prefs.getBool('autoSyncEnabled') ?? false;
       _playingReminderDays = prefs.getInt('playingReminderDays') ?? 7;
       _interestedReminderDays = prefs.getInt('interestedReminderDays') ?? 14;
       _selectedYear = prefs.getString('selectedYear') ?? 'Todas';
@@ -138,6 +153,7 @@ class _SettingsState extends State<Settings> {
     await prefs.setString('coverSize', _coverSize);
     await prefs.setString('sortCriteria', _sortCriteria);
     await prefs.setBool('enableNotifications', _enableNotifications);
+    await prefs.setBool('autoSyncEnabled', _autoSyncEnabled);
     await prefs.setInt('playingReminderDays', _playingReminderDays);
     await prefs.setInt('interestedReminderDays', _interestedReminderDays);
     await prefs.setString('selectedYear', _selectedYear);
@@ -284,6 +300,168 @@ class _SettingsState extends State<Settings> {
     );
   }
 
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isSyncing = true);
+
+    try {
+      // Usa el constructor simple para compatibilidad con la versión V5 o V6 antigua que instaló pub get
+      final GoogleSignIn googleSignIn = GoogleSignIn(); 
+
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+
+      if (googleUser == null) {
+        setState(() => _isSyncing = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
+
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      UserCredential userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+
+      setState(() {
+        _user = userCredential.user;
+        _isSyncing = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Sesión iniciada como ${_user?.displayName ?? "Usuario"}')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isSyncing = false);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al iniciar sesión: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+
+    await FirebaseAuth.instance.signOut();
+    await googleSignIn.signOut();
+
+    setState(() => _user = null);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Sesión cerrada')),
+      );
+    }
+  }
+
+  Future<void> _backupToCloud() async {
+    if (_user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes iniciar sesión primero')),
+      );
+      return;
+    }
+    setState(() => _isSyncing = true);
+
+    try {
+      final box = Hive.box('juegosBox');
+      final dynamic juegosList = box.get('juegos');
+
+      if (juegosList == null || juegosList is! List) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No hay datos locales para guardar.')));
+        setState(() => _isSyncing = false);
+        return;
+      }
+
+      final docRef = FirebaseFirestore.instance
+          .collection('user_data')
+          .doc(_user!.uid);
+
+      await docRef.set({
+        'games_backup': juegosList,
+        'lastBackup': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Copia de seguridad guardada en la nube!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isSyncing = false);
+    }
+  }
+
+  Future<void> _restoreFromCloud() async {
+    if (_user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes iniciar sesión primero')),
+      );
+      return;
+    }
+    setState(() => _isSyncing = true);
+
+    try {
+      final docRef = FirebaseFirestore.instance
+          .collection('user_data')
+          .doc(_user!.uid);
+      final docSnap = await docRef.get();
+
+      if (!docSnap.exists || docSnap.data()?['games_backup'] == null) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('No se encontró copia de seguridad.')));
+        setState(() => _isSyncing = false);
+        return;
+      }
+
+      final dynamic juegosList = docSnap.data()!['games_backup'];
+
+      if (juegosList is! List) {
+        if (mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Datos corruptos en la nube.')));
+        setState(() => _isSyncing = false);
+        return;
+      }
+
+      final box = Hive.box('juegosBox');
+      await box.put('juegos', juegosList);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('¡Datos restaurados desde la nube!')),
+        );
+        Navigator.pop(context, true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al restaurar: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isSyncing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -297,47 +475,25 @@ class _SettingsState extends State<Settings> {
           children: [
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Ajustes de visualización",
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text("Ajustes de visualización", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 12),
-                    _buildDropdown(
-                        "Forma de la lista:",
-                        _listStyle,
-                        ['Grid', 'Lista', 'Compacta'],
-                        ['Cuadrícula', 'Lista', 'Compacta'],
-                        _onListStyleChanged),
+                    _buildDropdown("Forma de la lista:", _listStyle, ['Grid', 'Lista', 'Compacta'], ['Cuadrícula', 'Lista', 'Compacta'], _onListStyleChanged),
                     const SizedBox(height: 12),
-                    _buildDropdown(
-                        "Tamaño de las carátulas:",
-                        _coverSize,
-                        ['Grandes', 'Medianas', 'Pequeñas'],
-                        ['Grandes', 'Medianas', 'Pequeñas'],
-                        _onCoverSizeChanged),
+                    _buildDropdown("Tamaño de las carátulas:", _coverSize, ['Grandes', 'Medianas', 'Pequeñas'], ['Grandes', 'Medianas', 'Pequeñas'], _onCoverSizeChanged),
                     const SizedBox(height: 12),
-                    _buildDropdown(
-                        "Criterio de ordenamiento:",
-                        _sortCriteria,
-                        ['Nombre', 'Fecha', 'Puntuación'],
-                        ['Nombre', 'Fecha de Inicio', 'Puntuación'],
-                        _onSortCriteriaChanged),
+                    _buildDropdown("Criterio de ordenamiento:", _sortCriteria, ['Nombre', 'Fecha', 'Puntuación'], ['Nombre', 'Fecha agregado', 'Puntuación'], _onSortCriteriaChanged),
                     const SizedBox(height: 12),
-                    Text("Filtrar por año (Inicio/Término):"),
+                    Text("Filtrar por año de agregado:"),
                     DropdownButton<String>(
-                      value: _availableYears.contains(_selectedYear)
-                          ? _selectedYear
-                          : 'Todas',
+                      value: _availableYears.contains(_selectedYear) ? _selectedYear : 'Todas',
                       isExpanded: true,
-                      items: _availableYears
-                          .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                          .toList(),
+                      items: _availableYears.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                       onChanged: _onYearChanged,
                     ),
                   ],
@@ -345,10 +501,89 @@ class _SettingsState extends State<Settings> {
               ),
             ),
             const SizedBox(height: 20),
+            
             Card(
               elevation: 3,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Sincronización en la Nube", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Sincronización Automática", style: TextStyle(fontWeight: FontWeight.w500)),
+                        Switch(
+                          value: _autoSyncEnabled,
+                          onChanged: (value) {
+                            setState(() {
+                              _autoSyncEnabled = value;
+                            });
+                            _saveSettings(); 
+                          },
+                        ),
+                      ],
+                    ),
+                    const Divider(),
+
+                    _isSyncing
+                    ? const Center(child: CircularProgressIndicator())
+                    : _user == null 
+                    ? Center(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.login),
+                          label: const Text("Iniciar sesión con Google"),
+                          onPressed: _signInWithGoogle,
+                        ),
+                      )
+                    : Column(
+                      children: [
+                        ListTile(
+                          leading: CircleAvatar(
+                            backgroundImage: _user!.photoURL != null ? NetworkImage(_user!.photoURL!) : null,
+                            child: _user!.photoURL == null ? const Icon(Icons.person) : null,
+                          ),
+                          title: Text(_user!.displayName ?? "Usuario"),
+                          subtitle: Text(_user!.email ?? "Sin email"),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.logout, color: Colors.red),
+                            onPressed: _signOut,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: _isSyncing ? null : _backupToCloud,
+                                child: _isSyncing ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Guardar en Nube"),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: _isSyncing ? null : _restoreFromCloud,
+                                child: _isSyncing ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text("Restaurar"),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            Card(
+              elevation: 3,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -357,9 +592,7 @@ class _SettingsState extends State<Settings> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text("Recordatorios de juegos",
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
+                        const Text("Recordatorios", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         Switch(
                           value: _enableNotifications,
                           onChanged: (value) {
@@ -373,6 +606,7 @@ class _SettingsState extends State<Settings> {
                     ),
                     const Divider(),
                     const SizedBox(height: 8),
+                    
                     Opacity(
                       opacity: _enableNotifications ? 1.0 : 0.5,
                       child: IgnorePointer(
@@ -380,29 +614,29 @@ class _SettingsState extends State<Settings> {
                         child: Column(
                           children: [
                             _buildIntDropdown(
-                                "Para juegos en 'Playing':",
-                                _playingReminderDays,
-                                _optionsDays, (val) {
-                              if (val != null) {
-                                setState(() => _playingReminderDays = val);
-                                _saveSettings();
+                              "Para juegos en 'Playing':", 
+                              _playingReminderDays, 
+                              _optionsDays, 
+                              (val) {
+                                 if(val != null) { setState(() => _playingReminderDays = val); _saveSettings(); }
                               }
-                            }),
+                            ),
                             const SizedBox(height: 12),
                             _buildIntDropdown(
-                                "Para juegos en 'Interested':",
-                                _interestedReminderDays,
-                                _optionsDays, (val) {
-                              if (val != null) {
-                                setState(() => _interestedReminderDays = val);
-                                _saveSettings();
+                              "Para juegos en 'Interested':", 
+                              _interestedReminderDays, 
+                              _optionsDays, 
+                              (val) {
+                                 if(val != null) { setState(() => _interestedReminderDays = val); _saveSettings(); }
                               }
-                            }),
+                            ),
                           ],
                         ),
                       ),
                     ),
+
                     const SizedBox(height: 20),
+                    
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
@@ -411,29 +645,25 @@ class _SettingsState extends State<Settings> {
                       ),
                     ),
                     const SizedBox(height: 8),
+
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed: _countdownSeconds > 0
-                            ? null
+                        onPressed: _countdownSeconds > 0 
+                            ? null 
                             : () async {
-                                if (await Permission.notification
-                                    .request()
-                                    .isGranted) {
-                                  await _scheduleGameNotifications(
-                                      testMode: true);
+                                if (await Permission.notification.request().isGranted) {
+                                  await _scheduleGameNotifications(testMode: true);
                                 } else {
                                   if (mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                          content: Text(
-                                              "Falta permiso de notificación")),
+                                      const SnackBar(content: Text("Falta permiso de notificación")),
                                     );
                                   }
                                 }
                               },
-                        child: Text(_countdownSeconds > 0
-                            ? "Esperando... ($_countdownSeconds)"
+                        child: Text(_countdownSeconds > 0 
+                            ? "Esperando... ($_countdownSeconds)" 
                             : "Probar recordatorios (10 seg)"),
                       ),
                     ),
@@ -447,39 +677,27 @@ class _SettingsState extends State<Settings> {
     );
   }
 
-  Widget _buildDropdown(String label, String value, List<String> items,
-      List<String> labels, Function(String?) onChanged) {
-    return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label),
-          DropdownButton<String>(
-            value: value,
-            isExpanded: true,
-            items: List.generate(items.length, (index) {
-              return DropdownMenuItem(
-                value: items[index],
-                child: Text(labels[index]),
-              );
-            }),
-            onChanged: onChanged,
-          )
-        ]);
+  Widget _buildDropdown(String label, String value, List<String> items, List<String> labels, Function(String?) onChanged) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label), DropdownButton<String>(
+      value: value, 
+      isExpanded: true, 
+      items: List.generate(items.length, (index) => DropdownMenuItem(value: items[index], child: Text(labels[index]))), 
+      onChanged: onChanged
+    )]);
   }
 
-  Widget _buildIntDropdown(
-      String label, int value, List<int> items, Function(int?)? onChanged) {
+  Widget _buildIntDropdown(String label, int value, List<int> items, Function(int?)? onChanged) {
     return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label),
-          DropdownButton<int>(
-              value: value,
-              isExpanded: true,
-              items: items
-                  .map((e) => DropdownMenuItem(value: e, child: Text('$e días')))
-                  .toList(),
-              onChanged: onChanged)
-        ]);
+      crossAxisAlignment: CrossAxisAlignment.start, 
+      children: [
+        Text(label), 
+        DropdownButton<int>(
+          value: value, 
+          isExpanded: true, 
+          items: items.map((e) => DropdownMenuItem(value: e, child: Text('$e días'))).toList(), 
+          onChanged: onChanged
+        )
+      ]
+    );
   }
 }

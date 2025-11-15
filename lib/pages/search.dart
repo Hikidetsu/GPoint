@@ -4,6 +4,9 @@ import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gpoint/models/game.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
@@ -230,6 +233,36 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     }
   }
 
+  Future<void> _triggerAutoSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool autoSyncEnabled = prefs.getBool('autoSyncEnabled') ?? false;
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (!autoSyncEnabled || user == null) {
+      return;
+    }
+
+    final box = Hive.box('juegosBox');
+    final dynamic juegosList = box.get('juegos');
+
+    if (juegosList == null || juegosList is! List) {
+      return;
+    }
+
+    try {
+      final docRef = FirebaseFirestore.instance
+          .collection('user_data')
+          .doc(user.uid);
+
+      await docRef.set({
+        'games_backup': juegosList,
+        'lastBackup': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error de Auto-Sync desde Search: $e");
+    }
+  }
+
   void _showAddDialog() {
     if (_gameDetails == null) return;
 
@@ -238,7 +271,7 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     String nuevoComentario = "";
     final String finalImage =
         _gameDetails!['background_image'] ?? widget.initialImage ?? "";
-    
+
     final TextEditingController inicioDateController = TextEditingController();
     final TextEditingController finDateController = TextEditingController();
     final String today = DateFormat('dd/MM/yyyy').format(DateTime.now());
@@ -339,13 +372,12 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
                 ElevatedButton(
                   onPressed: () {
                     _saveGameToHive(
-                        finalImage, 
-                        nuevoScore, 
-                        estadoLocal, 
+                        finalImage,
+                        nuevoScore,
+                        estadoLocal,
                         nuevoComentario,
                         inicioDateController.text,
-                        finDateController.text
-                    );
+                        finDateController.text);
                     Navigator.pop(context);
                   },
                   child: const Text("Guardar"),
@@ -358,8 +390,8 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
     );
   }
 
-  void _saveGameToHive(
-      String image, String score, String status, String comment, String fechaInicio, String fechaTermino) async {
+  void _saveGameToHive(String image, String score, String status, String comment,
+      String fechaInicio, String fechaTermino) async {
     final box = Hive.box('juegosBox');
     final List dynamicList = box.get('juegos', defaultValue: []);
 
@@ -397,6 +429,11 @@ class _GameDetailScreenState extends State<GameDetailScreen> {
 
     currentGames.add(newGame);
     await box.put('juegos', currentGames.map((g) => g.toMap()).toList());
+
+    // --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+    // Dispara la sincronización automática después de guardar localmente
+    _triggerAutoSync(); 
+    // ---------------------------------
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

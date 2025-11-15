@@ -13,6 +13,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gpoint/pages/about.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' as fs;
 
 class MyHomePage extends StatefulWidget {
   final String title;
@@ -57,7 +59,7 @@ class _MyHomePageState extends State<MyHomePage> {
           comentario: "Divertido.",
           fechaInicio: "10/10/2023",
           fechaTermino: "20/10/2023",
-          dateAddedTimestamp: nowTimestamp,
+          dateAddedTimestamp: 1696982400000,
         ),
       ];
       await box.put('juegos', juegos.map((g) => g.toMap()).toList());
@@ -85,9 +87,41 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  
+  Future<void> _triggerAutoSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool autoSyncEnabled = prefs.getBool('autoSyncEnabled') ?? false;
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (!autoSyncEnabled || user == null) {
+      return;
+    }
+
+    final box = Hive.box('juegosBox');
+    final dynamic juegosList = box.get('juegos');
+    
+    if (juegosList == null || juegosList is! List) {
+       return;
+    }
+
+    try {
+      final docRef = fs.FirebaseFirestore.instance 
+          .collection('user_data')
+          .doc(user.uid);
+
+      await docRef.set({
+        'games_backup': juegosList,
+        'lastBackup': fs.FieldValue.serverTimestamp(), 
+      }, fs.SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error de Auto-Sync desde Home: $e");
+    }
+  }
+
   void _saveJuegos() async {
     final box = Hive.box('juegosBox');
     await box.put('juegos', juegos.map((g) => g.toMap()).toList());
+    _triggerAutoSync(); // Dispara la sincronización automática
   }
 
   Future<void> _loadSettings() async {
@@ -122,11 +156,15 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _gotoConfig() async {
-    await Navigator.push(
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => Settings()),
+      MaterialPageRoute(builder: (context) => const Settings()), 
     );
     _loadSettings();
+
+    if (result == true) {
+      _loadJuegos();
+    }
   }
 
   Future<List<Map<String, dynamic>>> _searchAPI(String query) async {
@@ -164,7 +202,10 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _extractYear(String? date) {
     if (date != null && date.length >= 10) {
       try {
-        return date.substring(date.length - 4);
+        String year = date.substring(date.length - 4);
+        if (int.tryParse(year) != null) {
+          return year;
+        }
       } catch (e) {
         return null;
       }

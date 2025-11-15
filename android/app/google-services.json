@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "212658606737",
+    "project_id": "gpoint-5c8d6",
+    "storage_bucket": "gpoint-5c8d6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:212658606737:android:6bc9bb0f673d4649022530",
+        "android_client_info": {
+          "package_name": "com.example.gpoint"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "212658606737-v3lb10ifc8n5v59irs12m73g547tgno3.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.gpoint",
+            "certificate_hash": "fcc10d5c0e9cd8f7c4c22296b43cfe18cbf53595"
+          }
+        },
+        {
+          "client_id": "212658606737-sg4utdtq1c22l7drnv8er6b4kardu45h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjdKJAzfkLh_NAhoxRNT18lQ3ywuQ7ohw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "212658606737-a6p8pfoeff2jqrokbebd965qo0d1mj6s.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "212658606737-fa7bp78tkbb16b7a5coaungpkej19fln.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.gpoint"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -6,6 +6,9 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:gpoint/models/game.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class Details extends StatefulWidget {
   final Game juego;
@@ -26,6 +29,38 @@ class _DetailsState extends State<Details> {
   void initState() {
     super.initState();
     juegoActual = widget.juego;
+  }
+
+  // --- Lógica de Sincronización Automática ---
+
+  Future<void> _triggerAutoSync() async {
+    final prefs = await SharedPreferences.getInstance();
+    final bool autoSyncEnabled = prefs.getBool('autoSyncEnabled') ?? false;
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (!autoSyncEnabled || user == null) {
+      return;
+    }
+
+    final box = Hive.box('juegosBox');
+    final dynamic juegosList = box.get('juegos');
+    
+    if (juegosList == null || juegosList is! List) {
+       return;
+    }
+
+    try {
+      final docRef = FirebaseFirestore.instance
+          .collection('user_data')
+          .doc(user.uid);
+
+      await docRef.set({
+        'games_backup': juegosList,
+        'lastBackup': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("Error de Auto-Sync desde Details: $e");
+    }
   }
 
   Future<void> _seleccionarImagen() async {
@@ -60,6 +95,7 @@ class _DetailsState extends State<Details> {
           _hasChanged = true;
         });
 
+        // Guardar y sincronizar
         await _guardarJuegoLocal();
       }
     } catch (e) {
@@ -78,6 +114,9 @@ class _DetailsState extends State<Details> {
     if (widget.index >= 0 && widget.index < listaJuegos.length) {
       listaJuegos[widget.index] = juegoActual.toMap();
       await box.put('juegos', listaJuegos);
+      
+      // Llama al trigger de Auto-Sync después de guardar localmente
+      _triggerAutoSync(); 
     }
   }
 

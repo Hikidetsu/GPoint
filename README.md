@@ -28,6 +28,10 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 - La aplicación cuenta con botones de prueba para verificar las notificaciones (inmediata y 10 seg).
 - El usuario puede cambiar la visualización de la lista (Cuadrícula/Lista), el tamaño de portadas y el orden.
 - La aplicación cuenta con una Base de Datos Rápida (Hive) para funcionar sin conexión.
+- La aplicacion cuenta con autenticación con Google mediante FireBase
+- El usuario puede realizar guardado en la nube de forma manual, automatica y restaurar copias
+- La aplicacion cuenta con filtrado por fechas que existen en la lista
+- La aplicacion cuenta con el parametro de fechas al momento de agregar un juego
 
 
 - Link del apk
