@@ -39,7 +39,6 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 
 ```mermaid
 
-stateDiagram-v2
     [*] --> Pantalla_Principal
     Pantalla_Principal--> Pantalla_Noticias
     Pantalla_Principal-->Pantalla_Busqueda
@@ -54,6 +53,12 @@ stateDiagram-v2
     Pantalla_Acerca-->Info_Creador
     Pantalla_Configuraciones-->Visualizacion
     Pantalla_Configuraciones-->Notificaciones
+    Pantalla_Configuraciones-->GuardadoNube
+    GuardadoNube-->Mi_Lista
+    Mi_Lista-->GuardadoNube
+        
+
+ 
         
  
 
