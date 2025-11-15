@@ -38,7 +38,7 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 - https://drive.google.com/file/d/1xGKzZd-igvOs6_ESg4GFwXM4rMVbqXmF/view?usp=sharing
 
 ```mermaid
-
+    stateDiagram-v2
     [*] --> Pantalla_Principal
     Pantalla_Principal--> Pantalla_Noticias
     Pantalla_Principal-->Pantalla_Busqueda
