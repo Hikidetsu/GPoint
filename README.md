@@ -35,7 +35,7 @@ Es una aplicacion orientada a la comunidad gamer, en la cual el usuario puede ha
 
 
 - Link del apk
-- https://drive.google.com/file/d/1xGKzZd-igvOs6_ESg4GFwXM4rMVbqXmF/view?usp=sharing
+- https://drive.google.com/file/d/1Yfuv7DgF9Cxmna8e8SjlWT1mEDURVnGX/view?usp=sharing
 
 ```mermaid
     stateDiagram-v2
